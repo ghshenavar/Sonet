@@ -1,1 +1,1 @@
-# Sonet
+My own journal
