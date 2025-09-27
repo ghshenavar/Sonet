@@ -33,8 +33,12 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import android.content.Context
 import android.os.Build
+import androidx.compose.foundation.text.KeyboardActions
 import java.time.LocalDate
 import java.time.temporal.IsoFields
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextDecoration
 
 // DataStore extension
 val Context.dataStore by preferencesDataStore("workout_prefs")
@@ -96,6 +100,7 @@ fun BottomNavBar(navController: NavHostController) {
 data class NavItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 // ---------------- WORKOUT PLANNER ----------------
+// todo: bring back the colorsss + remember the workout types added
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutPlannerScreen(appContext: Context) {
@@ -231,6 +236,7 @@ fun WorkoutDayCard(
 }
 
 // ---------------- STATISTICS ----------------
+// todo: fix the date in the logs
 @Composable
 fun StatisticsScreen(appContext: Context, navController: NavHostController) {
     val scope = rememberCoroutineScope()
@@ -300,6 +306,7 @@ fun WorkoutLogScreen(appContext: Context, workout: String) {
 }
 
 // ---------------- TODO LIST ----------------
+// todo: make the todo item persistent
 @Composable
 fun TodoScreen() {
     var tabIndex by remember { mutableIntStateOf(0) }
@@ -315,15 +322,17 @@ fun TodoScreen() {
     }
 }
 
+data class TodoItem(val text: String, var done: Boolean = false)
+
 @Composable
 fun TodoList(type: String) {
-    val items = remember { mutableStateListOf("Task 1", "Task 2") }
+    val items = remember { mutableStateListOf<TodoItem>() }
+    var newTaskText by remember { mutableStateOf("") }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
-        // Show up to 5 tasks
-        items.take(5).forEach { task ->
+        items.forEach { task ->
             item {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -331,27 +340,47 @@ fun TodoList(type: String) {
                         .fillMaxWidth()
                         .padding(8.dp)
                 ) {
-                    Checkbox(checked = false, onCheckedChange = {})
+                    Checkbox(
+                        checked = task.done,
+                        onCheckedChange = { checked ->
+                            task.done = checked
+                            items[items.indexOf(task)] = task
+                        }
+                    )
                     Spacer(Modifier.width(8.dp))
-                    Text(task)
+                    Text(
+                        task.text,
+                        textDecoration = if (task.done) TextDecoration.LineThrough else TextDecoration.None
+                    )
                 }
             }
         }
 
-        // "Add task" row if less than 5 tasks
-        if (items.size < 5) {
-            item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                        .clickable { items.add("New Task") }
-                ) {
-                    Checkbox(checked = false, onCheckedChange = {})
-                    Spacer(Modifier.width(8.dp))
-                    Text("...")
-                }
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
+                Checkbox(checked = false, onCheckedChange = {})
+                Spacer(Modifier.width(8.dp))
+                TextField(
+                    value = newTaskText,
+                    onValueChange = { newTaskText = it },
+                    placeholder = { Text("...") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            if (newTaskText.isNotBlank()) {
+                                items.add(TodoItem(newTaskText.trim()))
+                                newTaskText = ""
+                            }
+                        }
+                    )
+                )
             }
         }
     }
