@@ -3,7 +3,6 @@ package com.example.sonet
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CheckCircle
@@ -23,24 +23,23 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
+import com.example.sonet.data.TodoRepository
+import com.example.sonet.data.WorkoutRepository
 import com.example.sonet.ui.theme.SonetTheme
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import androidx.datastore.preferences.core.*
-import androidx.datastore.preferences.preferencesDataStore
+import com.example.sonet.viewmodel.StatisticsViewModel
+import com.example.sonet.viewmodel.TodoViewModel
+import com.example.sonet.viewmodel.WorkoutViewModel
 import android.content.Context
-import android.os.Build
 import androidx.compose.foundation.text.KeyboardActions
-import java.time.LocalDate
-import java.time.temporal.IsoFields
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextDecoration
 
-// DataStore extension
 val Context.dataStore by preferencesDataStore("workout_prefs")
 
 class MainActivity : ComponentActivity() {
@@ -54,7 +53,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ---------------- MAIN APP WITH NAVIGATION ----------------
 @Composable
 fun MainApp(appContext: Context) {
     val navController = rememberNavController()
@@ -66,12 +64,45 @@ fun MainApp(appContext: Context) {
             startDestination = "workout",
             modifier = Modifier.padding(padding)
         ) {
-            composable("workout") { WorkoutPlannerScreen(appContext) }
-            composable("statistics") { StatisticsScreen(appContext, navController) }
-            composable("todo") { TodoScreen() }
+            composable("workout") {
+                val repository = remember { WorkoutRepository(appContext) }
+                val viewModel: WorkoutViewModel = viewModel(
+                    factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+                        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                            @Suppress("UNCHECKED_CAST")
+                            return WorkoutViewModel(repository) as T
+                        }
+                    }
+                )
+                WorkoutPlannerScreen(viewModel)
+            }
+            composable("statistics") {
+                val repository = remember { WorkoutRepository(appContext) }
+                val viewModel: StatisticsViewModel = viewModel(
+                    factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+                        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                            @Suppress("UNCHECKED_CAST")
+                            return StatisticsViewModel(repository) as T
+                        }
+                    }
+                )
+                StatisticsScreen(viewModel, navController)
+            }
+            composable("todo") {
+                val repository = remember { TodoRepository(appContext) }
+                val viewModel: TodoViewModel = viewModel(
+                    factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+                        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                            @Suppress("UNCHECKED_CAST")
+                            return TodoViewModel(repository) as T
+                        }
+                    }
+                )
+                TodoScreen(viewModel)
+            }
             composable("log/{workout}") { backStackEntry ->
                 val workout = backStackEntry.arguments?.getString("workout") ?: ""
-                WorkoutLogScreen(appContext, workout)
+                WorkoutLogScreen(workout)
             }
         }
     }
@@ -99,50 +130,13 @@ fun BottomNavBar(navController: NavHostController) {
 
 data class NavItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
-// ---------------- WORKOUT PLANNER ----------------
-// todo: bring back the colorsss + remember the workout types added
-@OptIn(ExperimentalMaterial3Api::class)
+// ============== UPDATED WORKOUT PLANNER ==============
 @Composable
-fun WorkoutPlannerScreen(appContext: Context) {
+fun WorkoutPlannerScreen(viewModel: WorkoutViewModel) {
     val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-    val workoutOptions = remember { mutableStateListOf("No option selected", "Climbing", "Leg", "Cardio") }
+    val weekData by viewModel.weekData.collectAsState()
+    val workoutOptions by viewModel.workoutOptions.collectAsState()
 
-    val today = LocalDate.now().dayOfWeek.name.take(3).lowercase()
-        .replaceFirstChar { it.uppercase() }
-    val currentWeek = LocalDate.now().get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)
-
-    val selections = remember { mutableStateMapOf<String, String>() }
-    var savedWeek by remember { mutableStateOf(currentWeek) }
-    val scope = rememberCoroutineScope()
-
-    // Load saved data
-    LaunchedEffect(Unit) {
-        val prefs = appContext.dataStore.data.first()
-        val storedWeek = prefs[intPreferencesKey("week_number")] ?: currentWeek
-        savedWeek = storedWeek
-        if (currentWeek != savedWeek) {
-            selections.clear()
-            savedWeek = currentWeek
-        } else {
-            days.forEach { day ->
-                val key = stringPreferencesKey("week_${currentWeek}_$day")
-                prefs[key]?.let { selections[day] = it }
-            }
-        }
-    }
-
-    fun saveSelection(day: String, workout: String) {
-        selections[day] = workout
-        scope.launch {
-            appContext.dataStore.edit { prefs ->
-                prefs[intPreferencesKey("week_number")] = currentWeek
-                val key = stringPreferencesKey("week_${currentWeek}_$day")
-                prefs[key] = workout
-            }
-        }
-    }
-
-    // Add new option dialog
     var showDialog by remember { mutableStateOf(false) }
     var newWorkoutName by remember { mutableStateOf("") }
 
@@ -158,12 +152,13 @@ fun WorkoutPlannerScreen(appContext: Context) {
                 WorkoutDayCard(
                     day = day,
                     workoutOptions = workoutOptions,
-                    selected = selections[day] ?: workoutOptions.first(),
-                    today = today,
-                    onSelect = { saveSelection(day, it) }
+                    selected = weekData.selections[day] ?: workoutOptions.first(),
+                    today = viewModel.today,
+                    onSelect = { viewModel.saveSelection(day, it) }
                 )
             }
         }
+
         Button(onClick = { showDialog = true }, modifier = Modifier.fillMaxWidth()) {
             Text("Add Option")
         }
@@ -177,9 +172,8 @@ fun WorkoutPlannerScreen(appContext: Context) {
                 },
                 confirmButton = {
                     Button(onClick = {
-                        val trimmed = newWorkoutName.trim()
-                        if (trimmed.isNotBlank() && !workoutOptions.any { it.equals(trimmed, true) }) {
-                            workoutOptions.add(trimmed)
+                        if (newWorkoutName.isNotBlank()) {
+                            viewModel.addWorkoutOption(newWorkoutName)
                         }
                         newWorkoutName = ""
                         showDialog = false
@@ -235,31 +229,11 @@ fun WorkoutDayCard(
     }
 }
 
-// ---------------- STATISTICS ----------------
-// todo: fix the date in the logs
+// ============== UPDATED STATISTICS ==============
 @Composable
-fun StatisticsScreen(appContext: Context, navController: NavHostController) {
-    val scope = rememberCoroutineScope()
-    var workoutData by remember { mutableStateOf<Map<String, List<LocalDate>>>(emptyMap()) }
-
-    LaunchedEffect(Unit) {
-        scope.launch {
-            val prefs = appContext.dataStore.data.first()
-            val map = mutableMapOf<String, MutableList<LocalDate>>()
-            prefs.asMap().forEach { (key, value) ->
-                if (key.name.startsWith("week_") && value is String) {
-                    val workout = value
-                    if (workout != "No option selected") {
-                        val date = LocalDate.now() // simplification
-                        map.getOrPut(workout) { mutableListOf() }.add(date)
-                    }
-                }
-            }
-            workoutData = map
-        }
-    }
-
-    val totalDays = workoutData.values.sumOf { it.size }
+fun StatisticsScreen(viewModel: StatisticsViewModel, navController: NavHostController) {
+    val stats by viewModel.workoutStats.collectAsState()
+    val totalDays = stats.workoutCounts.values.sum()
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Data available: $totalDays days", style = MaterialTheme.typography.titleLarge)
@@ -270,7 +244,7 @@ fun StatisticsScreen(appContext: Context, navController: NavHostController) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(workoutData.keys.toList()) { workout ->
+            items(stats.workoutCounts.keys.toList()) { workout ->
                 Card(
                     modifier = Modifier.fillMaxWidth().height(100.dp).clickable {
                         navController.navigate("log/$workout")
@@ -283,7 +257,7 @@ fun StatisticsScreen(appContext: Context, navController: NavHostController) {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(workout.replaceFirstChar { it.uppercase() }, fontWeight = FontWeight.Bold)
-                        Text("${workoutData[workout]?.size ?: 0} days")
+                        Text("${stats.workoutCounts[workout] ?: 0} days")
                     }
                 }
             }
@@ -292,8 +266,7 @@ fun StatisticsScreen(appContext: Context, navController: NavHostController) {
 }
 
 @Composable
-fun WorkoutLogScreen(appContext: Context, workout: String) {
-    // placeholder log
+fun WorkoutLogScreen(workout: String) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Workout log for $workout", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
@@ -305,10 +278,9 @@ fun WorkoutLogScreen(appContext: Context, workout: String) {
     }
 }
 
-// ---------------- TODO LIST ----------------
-// todo: make the todo item persistent
+// ============== UPDATED TODO ==============
 @Composable
-fun TodoScreen() {
+fun TodoScreen(viewModel: TodoViewModel) {
     var tabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("Today", "Eventually")
 
@@ -318,41 +290,40 @@ fun TodoScreen() {
                 Tab(selected = tabIndex == index, onClick = { tabIndex = index }, text = { Text(title) })
             }
         }
-        if (tabIndex == 0) TodoList("today") else TodoList("eventually")
+        if (tabIndex == 0) {
+            TodoList(viewModel, "today")
+        } else {
+            TodoList(viewModel, "eventually")
+        }
     }
 }
 
-data class TodoItem(val text: String, var done: Boolean = false)
-
 @Composable
-fun TodoList(type: String) {
-    val items = remember { mutableStateListOf<TodoItem>() }
+fun TodoList(viewModel: TodoViewModel, type: String) {
+    val todos by if (type == "today") viewModel.todayTodos.collectAsState()
+    else viewModel.eventuallyTodos.collectAsState()
+
     var newTaskText by remember { mutableStateOf("") }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
-        items.forEach { task ->
-            item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                ) {
-                    Checkbox(
-                        checked = task.done,
-                        onCheckedChange = { checked ->
-                            task.done = checked
-                            items[items.indexOf(task)] = task
-                        }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        task.text,
-                        textDecoration = if (task.done) TextDecoration.LineThrough else TextDecoration.None
-                    )
-                }
+        items(todos, key = { it.id }) { task ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
+                Checkbox(
+                    checked = task.done,
+                    onCheckedChange = { viewModel.toggleTodo(type, task.id) }
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    task.text,
+                    textDecoration = if (task.done) TextDecoration.LineThrough else TextDecoration.None
+                )
             }
         }
 
@@ -375,7 +346,7 @@ fun TodoList(type: String) {
                     keyboardActions = KeyboardActions(
                         onDone = {
                             if (newTaskText.isNotBlank()) {
-                                items.add(TodoItem(newTaskText.trim()))
+                                viewModel.addTodo(type, newTaskText)
                                 newTaskText = ""
                             }
                         }
@@ -385,4 +356,3 @@ fun TodoList(type: String) {
         }
     }
 }
-
