@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
 fun MainApp(appContext: Context) {
     val navController = rememberNavController()
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = { BottomNavBar(navController) }
     ) { padding ->
         NavHost(
@@ -139,49 +140,54 @@ fun WorkoutPlannerScreen(viewModel: WorkoutViewModel) {
     var showDialog by remember { mutableStateOf(false) }
     var newWorkoutName by remember { mutableStateOf("") }
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(days) { day ->
-                WorkoutDayCard(
-                    day = day,
-                    workoutOptions = workoutOptions,
-                    selected = weekData.selections[day] ?: workoutOptions.first(),
-                    today = viewModel.today,
-                    onSelect = { viewModel.saveSelection(day, it) }
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(Modifier.fillMaxSize().padding(16.dp)) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(days) { day ->
+                    WorkoutDayCard(
+                        day = day,
+                        workoutOptions = workoutOptions,
+                        selected = weekData.selections[day] ?: workoutOptions.first(),
+                        today = viewModel.today,
+                        onSelect = { viewModel.saveSelection(day, it) }
+                    )
+                }
+            }
+
+            Button(onClick = { showDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                Text("Add Option")
+            }
+
+            if (showDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDialog = false },
+                    title = { Text("Add Workout Option") },
+                    text = {
+                        TextField(value = newWorkoutName, onValueChange = { newWorkoutName = it })
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            if (newWorkoutName.isNotBlank()) {
+                                viewModel.addWorkoutOption(newWorkoutName)
+                            }
+                            newWorkoutName = ""
+                            showDialog = false
+                        }) { Text("Add") }
+                    },
+                    dismissButton = {
+                        Button(onClick = { showDialog = false }) { Text("Cancel") }
+                    }
                 )
             }
-        }
-
-        Button(onClick = { showDialog = true }, modifier = Modifier.fillMaxWidth()) {
-            Text("Add Option")
-        }
-
-        if (showDialog) {
-            AlertDialog(
-                onDismissRequest = { showDialog = false },
-                title = { Text("Add Workout Option") },
-                text = {
-                    TextField(value = newWorkoutName, onValueChange = { newWorkoutName = it })
-                },
-                confirmButton = {
-                    Button(onClick = {
-                        if (newWorkoutName.isNotBlank()) {
-                            viewModel.addWorkoutOption(newWorkoutName)
-                        }
-                        newWorkoutName = ""
-                        showDialog = false
-                    }) { Text("Add") }
-                },
-                dismissButton = {
-                    Button(onClick = { showDialog = false }) { Text("Cancel") }
-                }
-            )
         }
     }
 }
