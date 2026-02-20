@@ -130,7 +130,6 @@ fun BottomNavBar(navController: NavHostController) {
 
 data class NavItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
-// ============== UPDATED WORKOUT PLANNER ==============
 @Composable
 fun WorkoutPlannerScreen(viewModel: WorkoutViewModel) {
     val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -197,7 +196,8 @@ fun WorkoutDayCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val backgroundBrush = when {
-        selected.equals("No option selected", true) -> Brush.verticalGradient(listOf(Color.LightGray, Color.Gray))
+        selected.equals("No option selected", true) -> Brush.verticalGradient(listOf(Color.DarkGray, Color.Gray))
+        selected.equals("Rest", true) -> Brush.verticalGradient(listOf(Color.LightGray, Color.Gray))
         day == today -> Brush.verticalGradient(listOf(Color(0xFFFFD700), Color(0xFFFFE57F)))
         else -> Brush.verticalGradient(listOf(Color(0xFF4A148C), Color(0xFF7B1FA2)))
     }
@@ -210,15 +210,15 @@ fun WorkoutDayCard(
             Modifier.fillMaxSize().background(backgroundBrush).padding(8.dp)
         ) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-                Text(day, style = MaterialTheme.typography.titleMedium.copy(color = Color.White, fontFamily = FontFamily.Cursive))
+                Text(day, style = MaterialTheme.typography.titleLarge.copy(color = Color.White, fontFamily = FontFamily.Cursive))
                 Box {
                     TextButton(onClick = { expanded = true }) {
-                        Text(selected, color = Color.White)
+                        Text(selected, color = Color.White, fontFamily = FontFamily.Cursive)
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         workoutOptions.forEach { option ->
                             DropdownMenuItem(
-                                text = { Text(option) },
+                                text = { Text(option, fontFamily = FontFamily.Cursive) },
                                 onClick = { onSelect(option); expanded = false }
                             )
                         }
@@ -229,7 +229,6 @@ fun WorkoutDayCard(
     }
 }
 
-// ============== UPDATED STATISTICS ==============
 @Composable
 fun StatisticsScreen(viewModel: StatisticsViewModel, navController: NavHostController) {
     val stats by viewModel.workoutStats.collectAsState()
@@ -278,7 +277,6 @@ fun WorkoutLogScreen(workout: String) {
     }
 }
 
-// ============== UPDATED TODO ==============
 @Composable
 fun TodoScreen(viewModel: TodoViewModel) {
     var tabIndex by remember { mutableIntStateOf(0) }
@@ -287,7 +285,7 @@ fun TodoScreen(viewModel: TodoViewModel) {
     Column(Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = tabIndex) {
             tabs.forEachIndexed { index, title ->
-                Tab(selected = tabIndex == index, onClick = { tabIndex = index }, text = { Text(title) })
+                Tab(selected = tabIndex == index, onClick = { tabIndex = index }, text = { Text(title, style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Cursive)) })
             }
         }
         if (tabIndex == 0) {
@@ -322,6 +320,7 @@ fun TodoList(viewModel: TodoViewModel, type: String) {
                 Spacer(Modifier.width(8.dp))
                 Text(
                     task.text,
+                    fontFamily = FontFamily.Cursive,
                     textDecoration = if (task.done) TextDecoration.LineThrough else TextDecoration.None
                 )
             }
