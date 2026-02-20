@@ -39,6 +39,7 @@ import android.content.Context
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
+import com.example.sonet.ui.components.WorkoutBarChart
 
 val Context.dataStore by preferencesDataStore("workout_prefs")
 
@@ -243,6 +244,14 @@ fun StatisticsScreen(viewModel: StatisticsViewModel, navController: NavHostContr
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Data available: $totalDays days", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(16.dp))
+
+        Spacer(Modifier.height(8.dp))
+
+        WorkoutBarChart(workoutCounts = stats.workoutCounts)
+
+        Spacer(Modifier.height(24.dp))
+
+
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
             contentPadding = PaddingValues(8.dp),
